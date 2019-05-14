@@ -13,6 +13,7 @@ namespace pk3DS.Core.Randomizers
         private readonly Random rnd = Util.rand;
 
         private const decimal LearnTMPercent = 35; // Average Learnable TMs is 35.260.
+        private const decimal LearnSTABTMPercent = 80; // 
         private const decimal LearnTypeTutorPercent = 2; //136 special tutor moves learnable by species in Untouched ORAS.
         private const decimal LearnMoveTutorPercent = 30; //10001 tutor moves learnable by 826 species in Untouched ORAS.
         private const int tmcount = 100;
@@ -43,16 +44,17 @@ namespace pk3DS.Core.Randomizers
         public bool ModifyEggGroup = true;
         public decimal SameEggGroupChance = 50;
 
-        public decimal TMInheritanceDeviation = 10;
+        public decimal TMInheritanceDeviation = 0;
         public decimal AbilityInheritanceDeviation = 10;
         public decimal TypeInheritanceDeviation = 10;
 
         private const bool TMInheritance = true;
         private const bool AbilityInheritance = true;
         private const bool TypeInheritance = true;
-        private const bool ModifyLearnsetSmartly = true;
+        private const bool ModifyLearnsetSmartly = false;
 
         public ushort[] MoveIDsTMs { private get; set; }
+        
         public Move[] Moves => Game.Moves;
         public EvolutionSet[] Evos => Game.Evolutions;
 
@@ -73,20 +75,30 @@ namespace pk3DS.Core.Randomizers
         {
             for (var i = 1; i < Table.Length; i++)
                 Randomize(Table[i], i);
+            
+            List<Action<PersonalInfo, PersonalInfo>> propagations = new List<Action<PersonalInfo, PersonalInfo>>();
+            List<Action<PersonalInfo>> propagationDeviations = new List<Action<PersonalInfo>>();
 
             if (TMInheritance)
             {
-                PropagateAttribute(Table, Evos, "TMHM");
+                propagations.Add((a, b) => a.TMHM = b.TMHM);
                 if (TMInheritanceDeviation > 0)
                 {
-                    // TODO: TM Deviation
+                    propagationDeviations.Add(a =>
+                    {
+                        for (int i = 0; i < a.TMHM.Length; i++)
+                        {
+                            // Randomly flip whether TMs are learned TMInheritanceDeviation% of the time
+                            a.TMHM[i] ^= rnd.Next(100) < TMInheritanceDeviation;
+                        }
+                    });
                 }
             }
 
 
             if (AbilityInheritance)
             {
-                PropagateAttribute(Table, Evos, "Abilities");
+                propagations.Add((a, b) => a.Abilities = b.Abilities);
                 if (AbilityInheritanceDeviation > 0)
                 {
                     // TODO: Ability Deviation
@@ -95,15 +107,19 @@ namespace pk3DS.Core.Randomizers
 
             if (TypeInheritance)
             {
-                PropagateAttribute(Table, Evos, "Types");
+                propagations.Add((a, b) => a.Types = b.Types);
                 if (TypeInheritanceDeviation > 0)
                 {
                     // TODO: Type Deviation
                 }
             }
+            PropagateAttribute(Table, Evos, propagations, propagationDeviations);
         }
 
-        private void PropagateAttribute(PersonalInfo[] table, EvolutionSet[] evos, String propertyName)
+        private void PropagateAttribute(PersonalInfo[] table, 
+            EvolutionSet[] evos, 
+            List<Action<PersonalInfo, PersonalInfo>> propagations,
+            List<Action<PersonalInfo>> propagationDeviations)
         {
             int specCount = Game.MaxSpeciesID;
             var HandledIndexes = new HashSet<int>();
@@ -141,15 +157,28 @@ namespace pk3DS.Core.Randomizers
                     if (evoIndex >= table.Length)
                         continue;
 
-                    PropertyInfo currentProperty = pi.GetType().GetProperty(propertyName);
-                    PropertyInfo evoProperty = table[evoIndex].GetType().GetProperty(propertyName);
-
-                    if (currentProperty != null && evoProperty != null)
+                    if (!HandledIndexes.Contains(evoIndex))
                     {
-                        if (!HandledIndexes.Contains(evoIndex))
-                            evoProperty.SetValue(table[evoIndex], currentProperty, null);
-                        else // pre-evolution encountered! take the higher evolution's TM's since they have been propagated up already...
-                            currentProperty.SetValue(pi, evoProperty, null);
+                        foreach (Action<PersonalInfo, PersonalInfo> p in propagations)
+                        {
+                            p(table[index], pi);
+                        }
+
+                        foreach (Action<PersonalInfo> dev in propagationDeviations)
+                        {
+                            dev(table[index]);
+                        }
+                    }
+                    else // pre-evolution encountered! take the higher evolution's TM's since they have been propagated up already...
+                    {
+                        foreach (Action<PersonalInfo, PersonalInfo> p in propagations)
+                        {
+                            p(pi, table[index]);
+                        }
+                        foreach (Action<PersonalInfo> dev in propagationDeviations)
+                        {
+                            dev(pi);
+                        }
                     }
 
                     HandledIndexes.Add(evoIndex);
@@ -198,7 +227,7 @@ namespace pk3DS.Core.Randomizers
                 var type = m.Type;
                 bool typeMatch = types.Any(t => t == type);
                 // todo: how do I learn move?
-                return rnd.Next(0, 100) < LearnTMPercent;
+                return rnd.Next(100) < (typeMatch ? LearnSTABTMPercent : LearnTMPercent);
             }
 
             if (ModifyLearnsetTM)

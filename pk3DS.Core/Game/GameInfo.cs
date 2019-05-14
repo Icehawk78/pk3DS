@@ -7,6 +7,7 @@
         public int MaxMoveID { get; private set; }
         public ushort[] HeldItems { get; private set; }
         public int MaxAbilityID { get; private set; }
+        public ushort[] TMHMMoves { get; private set; }
 
         public GameInfo(GameConfig gameConfig)
         {
