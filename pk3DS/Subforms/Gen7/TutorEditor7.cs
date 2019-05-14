@@ -99,5 +99,35 @@ namespace pk3DS
         {
             WinFormsUtil.Alert("Not currently implemented.");
         }
+
+        internal static int[][] getTutorList()
+        {
+            string[] locationsTutor =
+            {
+                "Big Wave Beach",
+                "Heahea Beach",
+                "Ula'ula Beach",
+                "Battle Tree"
+            };
+            
+            byte[] data = File.ReadAllBytes(Path.Combine(Main.RomFSPath, "Shop.cro"));
+            byte[] len_BPTutor = data.Skip(0x52D2).Take(4).ToArray();
+            
+            
+            List<int[]> tutors = new List<int[]>();
+            for (int i = 0; i < locationsTutor.Length; i++)
+            {
+                List<int> currentTutors = new List<int>();
+                int count = len_BPTutor[i];
+                var ofs = ofs_BPTutor + (len_BPTutor.Take(i).Sum(z => z) * 4);
+                for (int j = 0; j < count; j++)
+                {
+                    currentTutors.Add(BitConverter.ToUInt16(data, ofs + (4 * j)));
+                }
+                tutors.Add(currentTutors.ToArray());
+            }
+
+            return tutors.ToArray();
+        }
     }
 }

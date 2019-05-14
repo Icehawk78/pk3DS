@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using pk3DS.Core.Structures;
 using pk3DS.Core.Structures.PersonalInfo;
 
@@ -42,9 +43,14 @@ namespace pk3DS.Core.Randomizers
         public bool ModifyEggGroup = true;
         public decimal SameEggGroupChance = 50;
 
-        private const bool Advanced = false;
-        private const bool TMInheritance = false;
-        private const bool ModifyLearnsetSmartly = false;
+        public decimal TMInheritanceDeviation = 10;
+        public decimal AbilityInheritanceDeviation = 10;
+        public decimal TypeInheritanceDeviation = 10;
+
+        private const bool TMInheritance = true;
+        private const bool AbilityInheritance = true;
+        private const bool TypeInheritance = true;
+        private const bool ModifyLearnsetSmartly = true;
 
         public ushort[] MoveIDsTMs { private get; set; }
         public Move[] Moves => Game.Moves;
@@ -69,10 +75,35 @@ namespace pk3DS.Core.Randomizers
                 Randomize(Table[i], i);
 
             if (TMInheritance)
-                PropagateTMs(Table, Evos);
+            {
+                PropagateAttribute(Table, Evos, "TMHM");
+                if (TMInheritanceDeviation > 0)
+                {
+                    // TODO: TM Deviation
+                }
+            }
+
+
+            if (AbilityInheritance)
+            {
+                PropagateAttribute(Table, Evos, "Abilities");
+                if (AbilityInheritanceDeviation > 0)
+                {
+                    // TODO: Ability Deviation
+                }
+            }
+
+            if (TypeInheritance)
+            {
+                PropagateAttribute(Table, Evos, "Types");
+                if (TypeInheritanceDeviation > 0)
+                {
+                    // TODO: Type Deviation
+                }
+            }
         }
 
-        private void PropagateTMs(PersonalInfo[] table, EvolutionSet[] evos)
+        private void PropagateAttribute(PersonalInfo[] table, EvolutionSet[] evos, String propertyName)
         {
             int specCount = Game.MaxSpeciesID;
             var HandledIndexes = new HashSet<int>();
@@ -110,10 +141,16 @@ namespace pk3DS.Core.Randomizers
                     if (evoIndex >= table.Length)
                         continue;
 
-                    if (!HandledIndexes.Contains(evoIndex))
-                        table[evoIndex].TMHM = pi.TMHM;
-                    else // pre-evolution encountered! take the higher evolution's TM's since they have been propagated up already...
-                        pi.TMHM = table[evoIndex].TMHM;
+                    PropertyInfo currentProperty = pi.GetType().GetProperty(propertyName);
+                    PropertyInfo evoProperty = table[evoIndex].GetType().GetProperty(propertyName);
+
+                    if (currentProperty != null && evoProperty != null)
+                    {
+                        if (!HandledIndexes.Contains(evoIndex))
+                            evoProperty.SetValue(table[evoIndex], currentProperty, null);
+                        else // pre-evolution encountered! take the higher evolution's TM's since they have been propagated up already...
+                            currentProperty.SetValue(pi, evoProperty, null);
+                    }
 
                     HandledIndexes.Add(evoIndex);
                     PropagateDownIndex(pi, evoIndex); // recurse for the rest of the evo chain

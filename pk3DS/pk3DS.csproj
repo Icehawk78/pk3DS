@@ -74,6 +74,18 @@
     <Compile Include="Subforms\EnhancedRestore.Designer.cs">
       <DependentUpon>EnhancedRestore.cs</DependentUpon>
     </Compile>
+    <Compile Include="Subforms\Gen6\GameSummary6.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Subforms\Gen6\GameSummary6.Designer.cs">
+      <DependentUpon>GameSummary6.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Subforms\Gen7\GameSummary7.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Subforms\Gen7\GameSummary7.Designer.cs">
+      <DependentUpon>GameSummary7.cs</DependentUpon>
+    </Compile>
     <Compile Include="Subforms\Gen7\MartEditor7UU.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -412,6 +424,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Subforms\Gen7\Experimental\OWSE7.resx">
       <DependentUpon>OWSE7.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Subforms\Gen7\GameSummary7.resx">
+      <DependentUpon>GameSummary7.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Subforms\Gen7\ItemEditor7.resx">
       <DependentUpon>ItemEditor7.cs</DependentUpon>

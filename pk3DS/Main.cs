@@ -1365,5 +1365,23 @@ namespace pk3DS
             }
             WinFormsUtil.Alert("Unable to set seed.");
         }
+
+        private void B_TypeDistributions_Click(object sender, EventArgs e)
+        {
+            if (threadActive())
+                return;
+
+            byte[][] d = Config.GARCPersonal.Files;
+            switch (Config.Generation)
+            {
+                case 6:
+                    Invoke((Action)(() => new GameSummary6().ShowDialog()));
+                    break;
+                case 7:
+                    Invoke((Action)(() => new GameSummary7().ShowDialog()));
+                    break;
+            }
+
+        }
     }
 }
