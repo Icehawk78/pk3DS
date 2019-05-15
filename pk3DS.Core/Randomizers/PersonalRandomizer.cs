@@ -44,13 +44,13 @@ namespace pk3DS.Core.Randomizers
         public bool ModifyEggGroup = true;
         public decimal SameEggGroupChance = 50;
 
-        public decimal TMInheritanceDeviation = 0;
+        public decimal TMInheritanceDeviation = 10;
         public decimal AbilityInheritanceDeviation = 10;
         public decimal TypeInheritanceDeviation = 10;
 
         private const bool TMInheritance = true;
-        private const bool AbilityInheritance = true;
-        private const bool TypeInheritance = true;
+        private const bool AbilityInheritance = false;
+        private const bool TypeInheritance = false;
         private const bool ModifyLearnsetSmartly = false;
 
         public ushort[] MoveIDsTMs { private get; set; }
@@ -81,7 +81,13 @@ namespace pk3DS.Core.Randomizers
 
             if (TMInheritance)
             {
-                propagations.Add((a, b) => a.TMHM = b.TMHM);
+                propagations.Add((a, b) =>
+                {
+                    for (var i = 0; i < a.TMHM.Length; i++)
+                    {
+                        b.TMHM[i] = a.TMHM[i];
+                    }
+                });
                 if (TMInheritanceDeviation > 0)
                 {
                     propagationDeviations.Add(a =>
@@ -89,7 +95,7 @@ namespace pk3DS.Core.Randomizers
                         for (int i = 0; i < a.TMHM.Length; i++)
                         {
                             // Randomly flip whether TMs are learned TMInheritanceDeviation% of the time
-                            a.TMHM[i] ^= rnd.Next(100) < TMInheritanceDeviation;
+                            a.TMHM[i] ^= (rnd.Next(100) < TMInheritanceDeviation);
                         }
                     });
                 }
@@ -121,68 +127,64 @@ namespace pk3DS.Core.Randomizers
             List<Action<PersonalInfo, PersonalInfo>> propagations,
             List<Action<PersonalInfo>> propagationDeviations)
         {
-            int specCount = Game.MaxSpeciesID;
-            var HandledIndexes = new HashSet<int>();
+            var specCount = Game.MaxSpeciesID;
+            var handledIndexes = new HashSet<int>();
 
-            for (int species = 1; species <= specCount; species++)
+            for (var species = 1; species <= specCount; species++)
             {
-                var entry = table[species];
-                PropagateDown(entry, species, 0);
-                for (int form = 0; form < entry.FormeCount; form++)
-                    PropagateDown(entry, species, form);
-            }
-
-            void PropagateDown(PersonalInfo pi, int species, int form)
-            {
-                int index = pi.FormeIndex(species, form);
-                if (index == species && form != 0)
-                    return;
-
-                if (index >= evos.Length)
-                    index = species;
-                PropagateDownIndex(pi, index);
-            }
-
-            void PropagateDownIndex(PersonalInfo pi, int index)
-            {
-                if (HandledIndexes.Contains(index))
-                    return;
-
-                var evoList = evos[index];
-                foreach (var evo in evoList.PossibleEvolutions.Where(z => z.Species != 0))
+                var current = table[species];
+                if (current.EvoStage == 1)
                 {
-                    var espec = evo.Species;
-                    var eform = evo.Form;
-                    var evoIndex = table[espec].FormeIndex(espec, eform);
-                    if (evoIndex >= table.Length)
-                        continue;
+                    Cascade(species);
+                }
+            }
 
-                    if (!HandledIndexes.Contains(evoIndex))
+            void Cascade(int baseId)
+            {
+                if (!handledIndexes.Contains(baseId))
+                {
+                    handledIndexes.Add(baseId);
+                    var basePi = table[baseId];
+                    foreach (var evoId in evos[baseId].PossibleEvolutions.Where(e => e.Species != 0)
+                        .Select(e => e.Species))
                     {
-                        foreach (Action<PersonalInfo, PersonalInfo> p in propagations)
+                        var evoPi = table[evoId];
+                        DoCascade(ref basePi, ref evoPi);
+                        if (evoPi.FormeCount > 1)
                         {
-                            p(table[index], pi);
+                            CascadeFormes(baseId, evoId);
                         }
 
-                        foreach (Action<PersonalInfo> dev in propagationDeviations)
-                        {
-                            dev(table[index]);
-                        }
+                        Cascade(evoId);
                     }
-                    else // pre-evolution encountered! take the higher evolution's TM's since they have been propagated up already...
+                }
+            }
+
+            void CascadeFormes(int baseId, int currentId)
+            {
+                var basePi = table[baseId];
+                var currentPi = table[currentId];
+                for (var formeIndex = 0; formeIndex < currentPi.FormeCount; formeIndex++)
+                {
+                    int formeId = currentPi.FormeIndex(currentId, formeIndex);
+                    if (formeId != currentId && formeIndex != 0 && !handledIndexes.Contains(formeId))
                     {
-                        foreach (Action<PersonalInfo, PersonalInfo> p in propagations)
-                        {
-                            p(pi, table[index]);
-                        }
-                        foreach (Action<PersonalInfo> dev in propagationDeviations)
-                        {
-                            dev(pi);
-                        }
+                        handledIndexes.Add(formeId);
+                        DoCascade(ref basePi, ref table[formeId]);
                     }
+                }
+            }
+            
+            void DoCascade(ref PersonalInfo basePi, ref PersonalInfo cascadeTo)
+            {
+                foreach (var p in propagations)
+                {
+                    p(basePi, cascadeTo);
+                }
 
-                    HandledIndexes.Add(evoIndex);
-                    PropagateDownIndex(pi, evoIndex); // recurse for the rest of the evo chain
+                foreach (var pd in propagationDeviations)
+                {
+                    pd(cascadeTo);
                 }
             }
         }
